@@ -75,10 +75,10 @@ bool GameLayer::init()
     
     b2BodyDef bodyDef;
     bodyDef.type = b2_dynamicBody;
-    bodyDef.position.Set(2.0f, 40.0f);
+    bodyDef.position.Set(20.0f, 30.0f);
     body1 = world->CreateBody(&bodyDef);
     bodyDef.type = b2_staticBody;
-    bodyDef.position.Set(12.0f, 40.0f);
+    bodyDef.position.Set(20.0f, 40.0f);
     body2 = world->CreateBody(&bodyDef);
 
     b2PolygonShape dynamicBox;
@@ -93,8 +93,8 @@ bool GameLayer::init()
     
     b2DistanceJointDef jDef;
     jDef.Initialize(body1, body2, body1->GetPosition(), body2->GetPosition());
+    jDef.frequencyHz = 1;
     j = (b2DistanceJoint*)world->CreateJoint(&jDef);
-    j->SetFrequency(1);
     
     // Create Cocos2D objects
     boxDrawable1 = CCLayerColor::create(ccc4(255, 0, 0, 255));
@@ -122,13 +122,6 @@ void GameLayer::draw()
 
 void GameLayer::update(float dt)
 {
-    if (j)
-        std::cout << j->GetReactionForce(1/dt).y << std::endl;
-    if (j && j->GetReactionForce(1/dt).y > 0) {
-        world->DestroyJoint(j);
-        j = NULL;
-    }
-
     g_pInput->Update();
     
 	// Update Box2D world
@@ -141,6 +134,20 @@ void GameLayer::update(float dt)
     CCPoint e = CCPoint(b.x + s.width, b.y + s.height);
     
     bool grabbed = g_pInput->m_Touched && g_pInput->m_X > b.x && g_pInput->m_X < e.x && (screenHeight - g_pInput->m_Y) > b.y && (screenHeight - g_pInput->m_Y) < e.y;
+    static bool was_grabbed = false;
+    static bool released = false;
+    released |= (was_grabbed & !grabbed);
+    was_grabbed = grabbed;
+
+    if (released && j) {
+        float inv_dt = 1/dt;
+        const float& x = j->GetReactionForce(inv_dt).x;
+        const float& y = j->GetReactionForce(inv_dt).y;
+        if (x + y > 0) {
+            world->DestroyJoint(j);
+            j = NULL;
+        }
+    }
     
     static float lastX, lastY, posY, posy;
     if (grabbed) {
