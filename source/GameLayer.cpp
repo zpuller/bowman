@@ -14,16 +14,24 @@
 #include <iostream>
 #include <algorithm>
 
-static CCLayerColor* lg;
-static b2Body* body;
-static float w = (float)s3eSurfaceGetInt(S3E_SURFACE_WIDTH);
-static float h = (float)s3eSurfaceGetInt(S3E_SURFACE_HEIGHT);
-static float winv = 1/w;
-static float hinv = 1/h;
+static CCLayerColor* boxDrawable1;
+static CCLayerColor* boxDrawable2;
+static b2Body* body1;
+static b2Body* body2;
+static float screenWidth = (float)s3eSurfaceGetInt(S3E_SURFACE_WIDTH);
+static float screenHeight = (float)s3eSurfaceGetInt(S3E_SURFACE_HEIGHT);
+static float screenWidthInv = 1/screenWidth;
+static float screenHeightInv = 1/screenHeight;
+static float coordWidth = 40;
+static float coordHeight = coordWidth * screenHeight / screenWidth;
+static float coordWidthInv = 1/coordWidth;
+static float coordHeightInv = 1/coordHeight;
+static float boxR = 2.0f;
 
 GameLayer::~GameLayer()
 {
     delete g_pInput;
+    delete world;
 }
 
 CCScene* GameLayer::scene()
@@ -37,13 +45,6 @@ CCScene* GameLayer::scene()
     // Add layer as a child to scene
     scene->addChild(layer);
 
-    lg = CCLayerColor::create(ccc4(255, 0, 0, 255));
-    float posy = body->GetPosition().y;
-    lg->setPosition(CCPoint(0, (posy-1)*.333*.5*h));
-    lg->setContentSize(CCSize(.1*w, .1*h));
-    lg->setColor(ccc3(0, 255, 0));
-    scene->addChild(lg);
-
     // Return the scene
     return scene;
 }
@@ -53,39 +54,56 @@ bool GameLayer::init()
 {
     if (!CCLayer::init())
         return false;
-
+    
+    g_pInput = new Input();
+    
     // Create main loop
     this->schedule(schedule_selector(GameLayer::update));
 
-    // COCOS2D TIP
-    // Create Cocos2D objects here
-
 	// Create Box2D world
-	world = new b2World(b2Vec2(0, 100));
+    b2Vec2 gravity(0.0f, -coordHeight);
+	world = new b2World(gravity);
 
-    // BOX2D TIP
-    // Create Box2D objects here
-    b2Vec2 gravity(0.0f, -10.0f);
-    world = new b2World(gravity);
+    // Create Box2D objects
     b2BodyDef groundBodyDef;
     groundBodyDef.position.Set(0.0f, -10.0f);
     b2Body* groundBody = world->CreateBody(&groundBodyDef);
     b2PolygonShape groundBox;
     groundBox.SetAsBox(50.0f, 10.0f);
     groundBody->CreateFixture(&groundBox, 0.0f);
+    
     b2BodyDef bodyDef;
     bodyDef.type = b2_dynamicBody;
-    bodyDef.position.Set(0.0f, 4.0f);
-    body = world->CreateBody(&bodyDef);
+    bodyDef.position.Set(2.0f, 40.0f);
+    body1 = world->CreateBody(&bodyDef);
+    bodyDef.position.Set(12.0f, 40.0f);
+    body2 = world->CreateBody(&bodyDef);
+
     b2PolygonShape dynamicBox;
-    dynamicBox.SetAsBox(1.0f, 1.0f);
+    dynamicBox.SetAsBox(2.0f, 2.0f);
     b2FixtureDef fixtureDef;
     fixtureDef.shape = &dynamicBox;
     fixtureDef.density = 1.0f;
     fixtureDef.friction = 0.3f;
-    body->CreateFixture(&fixtureDef);
+    body1->CreateFixture(&fixtureDef);
+    body2->CreateFixture(&fixtureDef);
     
-    g_pInput = new Input();
+    // Create Cocos2D objects
+    boxDrawable1 = CCLayerColor::create(ccc4(255, 0, 0, 255));
+    float posY = body1->GetPosition().x;
+    float posy = body1->GetPosition().y;
+    boxDrawable1->setPosition(CCPoint((posY-boxR)*screenWidth*coordWidthInv, (posy-boxR)*coordHeightInv*screenHeight));
+    boxDrawable1->setContentSize(CCSize(2*boxR*coordWidthInv*screenWidth, 2*boxR*coordHeightInv*screenHeight));
+    boxDrawable1->setColor(ccc3(0, 255, 0));
+    addChild(boxDrawable1);
+    
+    boxDrawable2 = CCLayerColor::create(ccc4(255, 0, 0, 255));
+    float posx2 = body2->GetPosition().x;
+    float posy2 = body2->GetPosition().y;
+    boxDrawable2->setPosition(CCPoint((posx2-boxR)*screenWidth*coordWidthInv, (posy2-boxR)*coordHeightInv*screenHeight));
+    boxDrawable2->setContentSize(CCSize(2*boxR*coordWidthInv*screenWidth, 2*boxR*coordHeightInv*screenHeight));
+    boxDrawable2->setColor(ccc3(0, 255, 0));
+    addChild(boxDrawable2);
 
     return true;
 }
@@ -103,38 +121,40 @@ void GameLayer::update(float dt)
     
     // BOX2D TIP
     // Update objects from box2d coordinates here
-    CCPoint b = lg->getPosition();
-    CCSize s = lg->getContentSize();
-    CCPoint e = CCPoint(b.x + s.width, b.y * s.height);
+    CCPoint b = boxDrawable1->getPosition();
+    CCSize s = boxDrawable1->getContentSize();
+    CCPoint e = CCPoint(b.x + s.width, b.y + s.height);
     
-    bool grabbed = g_pInput->m_Touched && g_pInput->m_X > b.x && g_pInput->m_X < e.x && (h - g_pInput->m_Y) > b.y && (h - g_pInput->m_Y) < e.y;
+    bool grabbed = g_pInput->m_Touched && g_pInput->m_X > b.x && g_pInput->m_X < e.x && (screenHeight - g_pInput->m_Y) > b.y && (screenHeight - g_pInput->m_Y) < e.y;
     
-    static float lastx, lasty, posx, posy;
+    static float lastX, lastY, posY, posy;
     if (grabbed) {
-        lg->setColor(ccc3(0, 255, 0));
+        boxDrawable1->setColor(ccc3(0, 255, 0));
         
         float pixelx = g_pInput->m_X - .5*s.width;
-        float pixely = h-g_pInput->m_Y - .5*s.height;
-        pixely = std::max(1.0f, pixely);
+        float pixely = screenHeight-g_pInput->m_Y - .5*s.height;
 
-        posx = pixelx * winv * 40;
-        posy = (pixely * 3 * 2 * hinv) + 1;
+        posY = (pixelx * screenWidthInv * coordWidth) + 2;
+        posy = (pixely * coordHeight * screenHeightInv) + 2;
         
-        lg->setPosition(CCPoint(pixelx, pixely));
-        body->SetAwake(true);
-        body->SetTransform(b2Vec2(posx, posy), 0);
-        static const int scale = 10;
-        body->SetLinearVelocity(b2Vec2(scale * (posx - lastx), scale * (posy - lasty)));
+        boxDrawable1->setPosition(CCPoint(pixelx, pixely));
+        body1->SetAwake(true);
+        body1->SetTransform(b2Vec2(posY, posy), 0);
+        static const int vScale = 10;
+        body1->SetLinearVelocity(b2Vec2(vScale * (posY - lastX), vScale * (posy - lastY)));
     }
     else {
-        lg->setColor(ccc3(255, 0, 0));
+        boxDrawable1->setColor(ccc3(255, 0, 0));
         
-        posx = body->GetPosition().x;
-        posy = body->GetPosition().y;
-        lg->setPosition(CCPoint(posx*w*.025, (posy-1)*.333*.5*h));
+        posY = body1->GetPosition().x;
+        posy = body1->GetPosition().y;
+        boxDrawable1->setPosition(CCPoint((posY-2)*screenWidth*coordWidthInv, (posy-2)*coordHeightInv*screenHeight));
     }
     
-    lastx = posx;
-    lasty = posy;
+    lastX = posY;
+    lastY = posy;
+    
+    float posx2 = body2->GetPosition().x;
+    float posy2 = body2->GetPosition().y;
+    boxDrawable2->setPosition(CCPoint((posx2-2)*screenWidth*coordWidthInv, (posy2-2)*coordHeightInv*screenHeight));
 }
-
