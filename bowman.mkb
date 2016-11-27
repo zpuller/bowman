@@ -8,6 +8,8 @@ files
     AppDelegate.h
     GameLayer.cpp
     GameLayer.h
+    Input.cpp
+    Input.h
 }
 
 subprojects
