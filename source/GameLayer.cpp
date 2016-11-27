@@ -27,6 +27,7 @@ static float coordHeight = coordWidth * screenHeight / screenWidth;
 static float coordWidthInv = 1/coordWidth;
 static float coordHeightInv = 1/coordHeight;
 static float boxR = 2.0f;
+static b2DistanceJoint* j;
 
 GameLayer::~GameLayer()
 {
@@ -76,6 +77,7 @@ bool GameLayer::init()
     bodyDef.type = b2_dynamicBody;
     bodyDef.position.Set(2.0f, 40.0f);
     body1 = world->CreateBody(&bodyDef);
+    bodyDef.type = b2_staticBody;
     bodyDef.position.Set(12.0f, 40.0f);
     body2 = world->CreateBody(&bodyDef);
 
@@ -85,8 +87,14 @@ bool GameLayer::init()
     fixtureDef.shape = &dynamicBox;
     fixtureDef.density = 1.0f;
     fixtureDef.friction = 0.3f;
+    fixtureDef.filter.groupIndex = -1;
     body1->CreateFixture(&fixtureDef);
     body2->CreateFixture(&fixtureDef);
+    
+    b2DistanceJointDef jDef;
+    jDef.Initialize(body1, body2, body1->GetPosition(), body2->GetPosition());
+    j = (b2DistanceJoint*)world->CreateJoint(&jDef);
+    j->SetFrequency(1);
     
     // Create Cocos2D objects
     boxDrawable1 = CCLayerColor::create(ccc4(255, 0, 0, 255));
@@ -104,7 +112,7 @@ bool GameLayer::init()
     boxDrawable2->setContentSize(CCSize(2*boxR*coordWidthInv*screenWidth, 2*boxR*coordHeightInv*screenHeight));
     boxDrawable2->setColor(ccc3(0, 255, 0));
     addChild(boxDrawable2);
-
+    
     return true;
 }
 
@@ -114,6 +122,13 @@ void GameLayer::draw()
 
 void GameLayer::update(float dt)
 {
+    if (j)
+        std::cout << j->GetReactionForce(1/dt).y << std::endl;
+    if (j && j->GetReactionForce(1/dt).y > 0) {
+        world->DestroyJoint(j);
+        j = NULL;
+    }
+
     g_pInput->Update();
     
 	// Update Box2D world
