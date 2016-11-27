@@ -134,6 +134,7 @@ void GameLayer::update(float dt)
     CCPoint e = CCPoint(b.x + s.width, b.y + s.height);
     
     bool grabbed = g_pInput->m_Touched && g_pInput->m_X > b.x && g_pInput->m_X < e.x && (screenHeight - g_pInput->m_Y) > b.y && (screenHeight - g_pInput->m_Y) < e.y;
+
     static bool was_grabbed = false;
     static bool released = false;
     released |= (was_grabbed & !grabbed);
@@ -146,6 +147,27 @@ void GameLayer::update(float dt)
         if (x + y > 0) {
             world->DestroyJoint(j);
             j = NULL;
+        }
+    }
+    
+    CCPoint b2 = boxDrawable2->getPosition();
+    CCSize s2 = boxDrawable2->getContentSize();
+    CCPoint e2 = CCPoint(b2.x + s2.width, b2.y + s2.height);
+    bool reset = g_pInput->m_Touched && g_pInput->m_X > b2.x && g_pInput->m_X < e2.x && (screenHeight - g_pInput->m_Y) > b2.y && (screenHeight - g_pInput->m_Y) < e2.y;
+    
+    if (reset) {
+        was_grabbed = false;
+        released = false;
+        
+        body1->SetTransform(b2Vec2(20.0f, 30.0f), 0);
+        body2->SetTransform(b2Vec2(20.0f, 40.0f), 0);
+        body1->SetLinearVelocity(b2Vec2(0.0f, 0.0f));
+
+        if (!j) {
+            b2DistanceJointDef jDef;
+            jDef.Initialize(body1, body2, body1->GetPosition(), body2->GetPosition());
+            jDef.frequencyHz = 1;
+            j = (b2DistanceJoint*)world->CreateJoint(&jDef);
         }
     }
     
